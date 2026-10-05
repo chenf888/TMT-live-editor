@@ -86,17 +86,3 @@ To see whether injection succeeded, check two places: whether there is a "TMT Li
 **The whole page freezes after adding a bar/infobox**: in early versions, the generated bar's `display` depended on closure variables, and the save
 only stored the function source; calling it after reload threw an error—and once the game's main loop (the `ticking` flag in `setInterval`) throws, it never resets, after which every frame returns immediately and the page appears completely frozen. New versions (from 1.2.1) use only `this` to get values and automatically repair this kind of broken bar when applying edits; if an old save is already damaged beyond repair,
 use **Clear Edits** in the panel and add it again.
-
-## Build
-
-The page code uses [`js/editable.js`](../js/editable.js) as the single source. After changing the source, run:
-
-```bash
-bash userscript/build.sh
-```
-
-During the build, `js/editable.js`, `js/editor.js`, and `userscript/src/*` are concatenated, then
-[`userscript/strip-comments.js`](strip-comments.js) strips all comments (keeping the `// ==UserScript==`
-metadata block). The stripper is a character-by-character lexical scan: strings, template strings (including nested `${}`), and regex literals
-are copied verbatim, so `//` and `/*` inside them are not mistaken for comments; line comments preserve newlines, and block comments are restored to
-spaces or newlines according to ASI rules, without changing semantics. Do not directly edit `tmt-live-editor.user.js`.
