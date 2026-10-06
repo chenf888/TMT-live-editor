@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TMT Live Editor（TMT 实时编辑器）
 // @namespace    chenf888/tmt-live-editor
-// @version      1.3.0
+// @version      1.3.1
 // @description  注入式油猴插件：在任意 The Modding Tree 引擎的增量游戏（2.5.x / 2.6.x，含 Prestige Tree Rewritten）上启用实时编辑系统。点击界面直接修改文本/数值，添加组件，自由拖拽布局中的一切，导出/导入编辑记录。检测到改版引擎（自带 editable）的页面会自动跳过。
 // @author       chenf888
 // @match        *://*/*
@@ -885,47 +885,66 @@ function tmtSyncTabFormat(layer){
         if(tmp[layer].tabFormat.length>tf.length)tmp[layer].tabFormat.splice(tf.length);
         if(hasFuncs&&funcs[layer].tabFormat.length>tf.length)funcs[layer].tabFormat.splice(tf.length);
     }
-    else if(tf&&typeof tf==="object"){
-        const cur=player.subtabs[layer]&&player.subtabs[layer].mainTabs;
-        const src=tf[cur]&&tf[cur].content;
-        if(!src)return;
-        prune(src);
-        if(tmp[layer].tabFormat[cur]===undefined)tmtSet(tmp[layer].tabFormat,cur,{content:[]});
-        if(!Array.isArray(tmp[layer].tabFormat[cur].content))tmtSet(tmp[layer].tabFormat[cur],"content",[]);
-        let ff=null;
-        if(hasFuncs){
-            if(funcs[layer].tabFormat[cur]===undefined)funcs[layer].tabFormat[cur]={content:[]};
-            if(funcs[layer].tabFormat[cur].content===src)funcs[layer].tabFormat[cur].content=[];
-            if(!Array.isArray(funcs[layer].tabFormat[cur].content))funcs[layer].tabFormat[cur].content=[];
-            ff=funcs[layer].tabFormat[cur].content;
-        }
-        const tt=tmp[layer].tabFormat[cur];
-        src.forEach((e,i)=>tmtSyncEntry(e,tt.content,ff?ff.content:null,i));
-        if(tt.content.length>src.length)tt.content.splice(src.length);
-        if(ff&&ff.content.length>src.length)ff.content.splice(src.length);
-    }
+	else if(tf&&typeof tf==="object"){
+		const cur=player.subtabs[layer]&&player.subtabs[layer].mainTabs;
+		const src=tf[cur]&&tf[cur].content;
+		if(!src)return;
+		prune(src);
+		
+		
+		
+		if(hasFuncs&&funcs[layer].tabFormat===tf){
+			const own={};
+			for(const k in tf){
+				const v=tf[k];
+				own[k]=(v!==null&&typeof v==="object"&&!Array.isArray(v))?Object.assign({},v):v;
+			}
+			funcs[layer].tabFormat=own;
+		}
+		if(hasFuncs&&funcs[layer].tabFormat[cur]===tf[cur])funcs[layer].tabFormat[cur]=Object.assign({},tf[cur]);
+		if(tmp[layer].tabFormat[cur]===undefined)tmtSet(tmp[layer].tabFormat,cur,{content:[]});
+		if(!Array.isArray(tmp[layer].tabFormat[cur].content))tmtSet(tmp[layer].tabFormat[cur],"content",[]);
+		let ff=null;
+		if(hasFuncs){
+			if(funcs[layer].tabFormat[cur]===undefined)funcs[layer].tabFormat[cur]={content:[]};
+			if(funcs[layer].tabFormat[cur].content===src)funcs[layer].tabFormat[cur].content=[];
+			if(!Array.isArray(funcs[layer].tabFormat[cur].content))funcs[layer].tabFormat[cur].content=[];
+			ff=funcs[layer].tabFormat[cur].content;
+		}
+		const tt=tmp[layer].tabFormat[cur];
+		src.forEach((e,i)=>tmtSyncEntry(e,tt.content,ff,i));
+		if(tt.content.length>src.length)tt.content.splice(src.length);
+		if(ff&&ff.length>src.length)ff.splice(src.length);
+	}
 }
 
 
+
+
+
+
 function tmtSyncEntry(entry,tmpArr,funcArr,idx){
-    const placeholder=typeof decimalOne!=="undefined"?decimalOne:1;
-    const setF=(k,v)=>{if(funcArr)tmtSet(funcArr,k,v);};
-    if(entry!==null&&typeof entry==="object"&&Array.isArray(entry)){
-        setF(idx,[]);
-        tmtSet(tmpArr,idx,[]);
-        for(let i=0;i<entry.length;i++){
-            const v=entry[i];
-            if(typeof v==="function"){setF(i,v);tmtSet(tmpArr[idx],i,placeholder);}
-            else if(v!==null&&typeof v==="object"&&Array.isArray(v)){
-                setF(i,[]);
-                tmtSet(tmpArr[idx],i,[]);
-                v.forEach((x,j)=>tmtSyncEntry(x,tmpArr[idx][i],funcArr?funcArr[i]:null,j));
-            }
-            else tmtSet(tmpArr[idx],i,v);
-        }
-    }
-    else if(typeof entry==="function"){setF(idx,entry);tmtSet(tmpArr,idx,placeholder);}
-    else tmtSet(tmpArr,idx,entry);
+	const placeholder=typeof decimalOne!=="undefined"?decimalOne:1;
+	if(entry!==null&&typeof entry==="object"&&Array.isArray(entry)){
+		if(funcArr)tmtSet(funcArr,idx,[]);
+		tmtSet(tmpArr,idx,[]);
+		const fSlot=funcArr?funcArr[idx]:null;
+		for(let i=0;i<entry.length;i++){
+			const v=entry[i];
+			if(typeof v==="function"){if(fSlot)tmtSet(fSlot,i,v);tmtSet(tmpArr[idx],i,placeholder);}
+			else if(v!==null&&typeof v==="object"&&Array.isArray(v)){
+				if(fSlot)tmtSet(fSlot,i,[]);
+				tmtSet(tmpArr[idx],i,[]);
+				v.forEach((x,j)=>tmtSyncEntry(x,tmpArr[idx][i],fSlot?fSlot[i]:null,j));
+			}
+			else tmtSet(tmpArr[idx],i,v);
+		}
+	}
+	else if(typeof entry==="function"){
+		if(funcArr)tmtSet(funcArr,idx,entry);
+		tmtSet(tmpArr,idx,placeholder);
+	}
+	else tmtSet(tmpArr,idx,entry);
 }
 
 
