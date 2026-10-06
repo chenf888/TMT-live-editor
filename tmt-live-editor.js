@@ -1,13 +1,16 @@
 // ==UserScript==
 // @name         TMT Live Editor（TMT 实时编辑器）
 // @namespace    chenf888/tmt-live-editor
-// @version      1.3.1
-// @description  注入式油猴插件：在任意 The Modding Tree 引擎的增量游戏（2.5.x / 2.6.x，含 Prestige Tree Rewritten）上启用实时编辑系统。点击界面直接修改文本/数值，添加组件，自由拖拽布局中的一切，导出/导入编辑记录。检测到改版引擎（自带 editable）的页面会自动跳过。
+// @version      1.4.0
+// @description  注入式油猴插件：在任意 The Modding Tree 引擎的增量游戏（2.5.x / 2.6.x，含 Prestige Tree Rewritten）上启用实时编辑系统。点击界面直接修改文本/数值，添加组件，自由拖拽布局中的一切，导出/导入编辑记录，按树管理编辑存档（自动/手动、跨网址），自定义各层级的重置快捷键。检测到改版引擎（自带 editable）的页面会自动跳过。
 // @author       chenf888
 // @match        *://*/*
 // @match        file:///*
 // @grant        unsafeWindow
 // @grant        GM_registerMenuCommand
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_deleteValue
 // @run-at       document-start
 // @inject-into  auto
 // @license      MIT
@@ -20,6 +23,17 @@
 
 	const W = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
 	const IN_SANDBOX = typeof unsafeWindow !== "undefined";
+
+	
+	
+	
+	if (typeof GM_getValue === "function" && typeof GM_setValue === "function") {
+		W.__tmtLiveGMStore = {
+			get: function (k) { try { return GM_getValue(k); } catch (e) { return undefined; } },
+			set: function (k, v) { try { GM_setValue(k, v); } catch (e) {} },
+			del: function (k) { try { if (typeof GM_deleteValue === "function") GM_deleteValue(k); } catch (e) {} }
+		};
+	}
 
 	
 	
@@ -87,6 +101,24 @@ const tmtI18N = {
         c_applySaved: "已应用持久化的编辑", c_ignoreLayer: "[TMT-Live] 忽略未知图层：", c_editorBtn: "结构编辑器（改任意字段）",
         c_preApplyFail: "预应用编辑失败", c_applyFail: "应用编辑失败",
         infoboxBodyHint: "（点击正文可直接编辑）",
+        b_archive: "存档管理", b_hotkeys: "快捷键",
+        a_title: "TMT 存档管理器", a_curTree: "当前模组树：{N}",
+        a_auto: "自动存档（每10分钟，最多留3份）", a_now: "立即存档",
+        a_impClip: "导入（剪贴板）", a_impFile: "导入（文件）",
+        a_showAll: "展示全部", a_showCur: "只看本树",
+        a_load: "载入", a_clip: "复制", a_file: "导出文件", a_rename: "改名",
+        a_empty: "还没有存档。", a_tagAuto: "自动", a_tagManual: "手动",
+        a_namePrompt: "存档名字（留空则只显示时间）：", a_renamePrompt: "新名字（留空清除名字）：",
+        a_confirmLoad: "载入存档「{N}」会覆盖当前全部编辑记录，继续？",
+        a_confirmLoadCross: "存档「{N}」来自模组树「{T}」，载入会把它套到当前树上并覆盖全部编辑记录，继续？",
+        a_confirmDelete: "删除存档「{N}」？",
+        a_saved: "已存档", a_saveFail: "存档写入失败（存储空间不足？）",
+        a_siteHead: "模组树「{N}」", a_siteCount: "{C} 份存档", a_impPaste: "粘贴存档内容（安全格式 JSON）：",
+        h_title: "TMT 快捷键", h_engine: "树内快捷键", h_custom: "自定义重置键",
+        h_none: "未设置", h_set: "设置按键", h_recording: "按下按键…（Esc 取消）",
+        h_clear: "清除", h_locked: "未解锁", h_noneEngine: "（此层没有树内快捷键）",
+        h_bound: "「{L}」的重置键已设为 {K}", h_cleared: "已清除「{L}」的自定义按键",
+        h_reset: "重置 {L}", h_note: "自定义按键优先于树内按键生效（按下即重置对应层级）；正在输入文字时不会触发。",
     },
     en: {
         addToLayer: "Add component to layer \"{L}\"", insertBefore: "(insert before item {N})",
@@ -145,6 +177,24 @@ const tmtI18N = {
         c_applySaved: "Applied saved edits", c_ignoreLayer: "[TMT-Live] ignoring unknown layer: ", c_editorBtn: "Structure editor (edit any field)",
         c_preApplyFail: "Failed to pre-apply edits", c_applyFail: "Failed to apply edits",
         infoboxBodyHint: "(click to edit this text)",
+        b_archive: "Archives", b_hotkeys: "Hotkeys",
+        a_title: "TMT Archive Manager", a_curTree: "Current tree: {N}",
+        a_auto: "Auto archive (every 10 min, keep 3)", a_now: "Save now",
+        a_impClip: "Import (clipboard)", a_impFile: "Import (file)",
+        a_showAll: "Show all", a_showCur: "This tree only",
+        a_load: "Load", a_clip: "Copy", a_file: "Export file", a_rename: "Rename",
+        a_empty: "No archives yet.", a_tagAuto: "auto", a_tagManual: "manual",
+        a_namePrompt: "Archive name (blank = show time only):", a_renamePrompt: "New name (blank to clear):",
+        a_confirmLoad: "Loading archive \"{N}\" overwrites ALL current edits. Continue?",
+        a_confirmLoadCross: "Archive \"{N}\" is from tree \"{T}\". Loading applies it to the current tree and overwrites ALL edits. Continue?",
+        a_confirmDelete: "Delete archive \"{N}\"?",
+        a_saved: "Archived", a_saveFail: "Failed to write archive (storage full?)",
+        a_siteHead: "Tree \"{N}\"", a_siteCount: "{C} archives", a_impPaste: "Paste archive content (safe-format JSON):",
+        h_title: "TMT Hotkeys", h_engine: "Tree hotkeys", h_custom: "Custom reset key",
+        h_none: "not set", h_set: "Set key", h_recording: "Press a key… (Esc to cancel)",
+        h_clear: "Clear", h_locked: "locked", h_noneEngine: "(no tree hotkeys on this layer)",
+        h_bound: "Reset key for \"{L}\" set to {K}", h_cleared: "Custom key cleared for \"{L}\"",
+        h_reset: "Reset {L}", h_note: "Custom keys take priority over tree hotkeys (pressing resets the layer); they do not fire while typing.",
     },
 };
 function tmtT(key, rep){
@@ -2361,6 +2411,833 @@ if(typeof document!=="undefined"){
 
 
 
+
+const TMT_ARCHIVE_KEY="tmtlive_archives";
+const TMT_ARCHIVE_AUTO_MS=10*60*1000;
+const TMT_ARCHIVE_KEEP_AUTO=3;
+let tmtArchiveBooted=false;
+let tmtArchiveShowAll=false;
+
+
+
+
+function tmtArchiveGM(){
+    try{
+        const g=window.__tmtLiveGMStore;
+        if(g&&typeof g.get==="function"&&typeof g.set==="function")return g;
+    }catch(e){}
+    return null;
+}
+
+function tmtArchiveReadRaw(){
+    const g=tmtArchiveGM();
+    if(g){
+        try{
+            const r=g.get(TMT_ARCHIVE_KEY);
+            if(typeof r==="string"&&r)return r;
+        }catch(e){}
+        return null;
+    }
+    try{
+        const r=localStorage.getItem(TMT_ARCHIVE_KEY);
+        if(r)return r;
+    }catch(e){}
+    return null;
+}
+
+function tmtArchiveWriteRaw(s){
+    const g=tmtArchiveGM();
+    if(g){
+        try{g.set(TMT_ARCHIVE_KEY,s);return true;}catch(e){}
+    }
+    try{
+        localStorage.setItem(TMT_ARCHIVE_KEY,s);
+        return true;
+    }catch(e){
+        alert(tmtT("a_saveFail"));
+        return false;
+    }
+}
+
+function tmtArchiveDB(){
+    let db=null;
+    const raw=tmtArchiveReadRaw();
+    if(raw){
+        try{db=JSON.parse(raw);}catch(e){}
+    }
+    if(!db||typeof db!=="object"||Array.isArray(db)||!db.sites||typeof db.sites!=="object"||Array.isArray(db.sites))
+        db={v:1,sites:{}};
+    return db;
+}
+
+
+function tmtArchiveMutate(fn){
+    const db=tmtArchiveDB();
+    const r=fn(db);
+    tmtArchiveWriteRaw(JSON.stringify(db));
+    return r;
+}
+
+
+
+function tmtArchiveSiteKey(){
+    let id="unknown";
+    try{
+        if(typeof modInfo!=="undefined")id=modInfo.id||modInfo.name||"unknown";
+    }catch(e){}
+    return String(id);
+}
+
+function tmtArchiveNewSite(key){
+    return {key:key,name:key,hosts:[],auto:true,lastAuto:0,archives:[]};
+}
+
+
+function tmtArchiveSite(db,create){
+    const key=tmtArchiveSiteKey();
+    if(!db.sites)db.sites={};
+    let s=db.sites[key];
+    if(!s){
+        if(!create)return null;
+        s=db.sites[key]=tmtArchiveNewSite(key);
+    }
+    if(s.auto===undefined)s.auto=true;
+    if(!Array.isArray(s.archives))s.archives=[];
+    return s;
+}
+
+
+function tmtArchiveTouchHost(){
+    let host="";
+    try{host=location.host||"local";}catch(e){host="local";}
+    tmtArchiveMutate(db=>{
+        const s=tmtArchiveSite(db,true);
+        if(!s)return;
+        if(!Array.isArray(s.hosts))s.hosts=[];
+        const at=s.hosts.indexOf(host);
+        if(at>=0)s.hosts.splice(at,1);
+        s.hosts.unshift(host);
+        if(s.hosts.length>5)s.hosts.length=5;
+    });
+}
+
+
+
+function tmtArchiveSnapshot(){
+    return modToJSON(typeof mod!=="undefined"&&mod?mod:{});
+}
+
+function tmtArchiveTimeStr(t){
+    const d=new Date(t),p=n=>String(n).padStart(2,"0");
+    return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"_"+p(d.getHours())+"-"+p(d.getMinutes())+"-"+p(d.getSeconds());
+}
+
+function tmtArchiveDispTime(t){
+    try{return new Date(t).toLocaleString();}catch(e){return String(t);}
+}
+
+function tmtArchiveFind(siteKey,id){
+    const db=tmtArchiveDB();
+    const site=(db.sites||{})[siteKey];
+    if(!site||!Array.isArray(site.archives))return null;
+    return site.archives.filter(a=>a&&a.id===id)[0]||null;
+}
+
+
+function tmtArchiveAdd(opts){
+    opts=opts||{};
+    const data=tmtArchiveSnapshot();
+    return tmtArchiveMutate(db=>{
+        const site=tmtArchiveSite(db,true);
+        const now=Date.now();
+        const entry={
+            id:"a"+now.toString(36)+Math.random().toString(36).slice(2,6),
+            name:(opts.name&&String(opts.name).trim())||null,
+            time:now,auto:!!opts.auto,data:data,
+        };
+        site.archives.unshift(entry);
+        if(opts.auto){
+            site.lastAuto=now;
+            
+            let autos=site.archives.filter(a=>a.auto);
+            while(autos.length>TMT_ARCHIVE_KEEP_AUTO){
+                const victim=autos.pop();
+                const at=site.archives.indexOf(victim);
+                if(at>=0)site.archives.splice(at,1);
+                autos=site.archives.filter(a=>a.auto);
+            }
+        }
+        return entry;
+    });
+}
+
+function tmtArchiveDelete(siteKey,id){
+    tmtArchiveMutate(db=>{
+        const site=(db.sites||{})[siteKey];
+        if(!site||!Array.isArray(site.archives))return;
+        const at=site.archives.findIndex(a=>a&&a.id===id);
+        if(at>=0)site.archives.splice(at,1);
+    });
+}
+
+function tmtArchiveRename(siteKey,id){
+    const cur=tmtArchiveFind(siteKey,id);
+    if(!cur)return;
+    const name=prompt(tmtT("a_renamePrompt"),cur.name||"");
+    if(name===null)return;
+    const clean=String(name).trim();
+    tmtArchiveMutate(db=>{
+        const site=(db.sites||{})[siteKey];
+        const entry=site&&Array.isArray(site.archives)?site.archives.filter(a=>a&&a.id===id)[0]:null;
+        if(entry)entry.name=clean||null;
+    });
+    tmtArchivePanelRefresh();
+}
+
+
+
+
+function tmtArchiveApply(siteKey,id){
+    const entry=tmtArchiveFind(siteKey,id);
+    if(!entry)return;
+    const label=entry.name||tmtArchiveDispTime(entry.time);
+    const cross=siteKey!==tmtArchiveSiteKey();
+    const ok=cross?confirm(tmtT("a_confirmLoadCross",{N:label,T:siteKey}))
+                  :confirm(tmtT("a_confirmLoad",{N:label}));
+    if(!ok)return;
+    let edits;
+    try{
+        edits=modFromJSON(entry.data);
+    }catch(e){
+        alert(tmtT("m_importFail")+(e&&e.message?e.message:e));
+        return;
+    }
+    window.mod=edits;
+    try{
+        applyEdits(edits);
+    }catch(e){
+        alert(tmtT("m_importFail")+(e&&e.message?e.message:e));
+        return;
+    }
+    try{if(typeof save==="function")save();}catch(e){}
+    window.location.reload();
+}
+
+function tmtArchiveSanitizeId(s){
+    return String(s).replace(/[\\\/:*?\"<>|\s]+/g,"-").slice(0,80)||"tree";
+}
+
+function tmtArchiveDownload(filename,text){
+    const a=document.createElement("a");
+    try{
+        const blob=new Blob([text],{type:"text/plain"});
+        a.href=URL.createObjectURL(blob);
+        setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    }catch(e){
+        a.href="data:text/plain;charset=utf-8,"+encodeURIComponent(text);
+    }
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function tmtArchiveExportClipboard(siteKey,id){
+    const entry=tmtArchiveFind(siteKey,id);
+    if(!entry)return;
+    tmtCopyText(entry.data);
+    tmtArchiveFlash(tmtT("m_copied"));
+}
+
+function tmtArchiveExportFile(siteKey,id){
+    const entry=tmtArchiveFind(siteKey,id);
+    if(!entry)return;
+    tmtArchiveDownload(tmtArchiveSanitizeId(siteKey)+"_"+tmtArchiveTimeStr(entry.time)+".txt",entry.data);
+}
+
+
+function tmtArchiveImportText(text,siteKey){
+    if(!text||!String(text).trim())return false;
+    text=String(text);
+    if(text.length>2*1024*1024){alert(tmtT("m_tooBig"));return false;}
+    try{
+        modFromJSON(text);
+    }catch(e){
+        alert(tmtT("m_importFail")+(e&&e.message?e.message:e));
+        return false;
+    }
+    const key=siteKey||tmtArchiveSiteKey();
+    tmtArchiveMutate(db=>{
+        let site=(db.sites||{})[key];
+        if(!site){
+            if(!db.sites)db.sites={};
+            site=db.sites[key]=tmtArchiveNewSite(key);
+        }
+        if(!Array.isArray(site.archives))site.archives=[];
+        site.archives.unshift({
+            id:"a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+            name:null,time:Date.now(),auto:false,data:text,
+        });
+    });
+    return true;
+}
+
+function tmtArchiveImportClipboard(){
+    const s=prompt(tmtT("a_impPaste"));
+    if(s===null)return;
+    if(tmtArchiveImportText(s,null))tmtArchivePanelRefresh();
+}
+
+
+function tmtArchiveImportFile(){
+    const inp=document.createElement("input");
+    inp.type="file";
+    inp.accept=".txt,.json,text/plain";
+    inp.onchange=()=>{
+        const f=inp.files&&inp.files[0];
+        if(!f)return;
+        const rd=new FileReader();
+        rd.onload=()=>{
+            let siteKey=null;
+            const stem=String(f.name||"").replace(/\.(txt|json)$/i,"");
+            const m=stem.match(/^(.*)_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$/);
+            if(m&&m[1])siteKey=m[1];
+            if(tmtArchiveImportText(String(rd.result),siteKey))tmtArchivePanelRefresh();
+        };
+        rd.readAsText(f);
+    };
+    inp.click();
+}
+
+
+
+function tmtArchiveAutoTick(){
+    if(typeof player==="undefined"||!player)return;
+    if(typeof mod==="undefined")return;
+    const db=tmtArchiveDB();
+    const site=tmtArchiveSite(db,false);
+    if(!site||!site.auto)return;
+    const now=Date.now();
+    if(site.lastAuto&&now-site.lastAuto<TMT_ARCHIVE_AUTO_MS-1500)return;
+    
+    if(!Object.keys(mod).length)return;
+    tmtArchiveAdd({auto:true});
+}
+
+function tmtArchiveBoot(){
+    if(tmtArchiveBooted)return;
+    if(typeof document==="undefined")return;
+    tmtArchiveBooted=true;
+    setTimeout(()=>{try{tmtArchiveTouchHost();}catch(e){}},1000);
+    
+    setTimeout(()=>{try{tmtArchiveAutoTick();}catch(e){}},25000);
+    setInterval(()=>{try{tmtArchiveAutoTick();}catch(e){}},60000);
+}
+
+if(typeof document!=="undefined"){
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",tmtArchiveBoot);
+    else tmtArchiveBoot();
+}
+
+
+
+function tmtArchiveStyle(){
+    if(document.getElementById("tmtArchiveStyle"))return;
+    const st=document.createElement("style");
+    st.id="tmtArchiveStyle";
+    st.textContent=
+        "#tmtArchivePanel{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:1000000;"+
+            "display:flex;align-items:center;justify-content:center;font:12px/1.7 monospace}"+
+        "#tmtArchivePanel .tmtARPanel{background:#111;color:#ddd;border:1px solid #0f0;border-radius:8px;"+
+            "padding:12px 14px;width:720px;max-width:94vw;max-height:84vh;display:flex;flex-direction:column;"+
+            "box-shadow:0 4px 24px rgba(0,0,0,.6)}"+
+        "#tmtArchivePanel .tmtARHead{color:#0f0;margin-bottom:4px}"+
+        "#tmtArchivePanel .tmtARBar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}"+
+        "#tmtArchivePanel .tmtARBar label{color:#9fd;display:flex;gap:4px;align-items:center}"+
+        "#tmtArchivePanel .tmtARBody{overflow:auto;max-height:54vh;border:1px solid #234;border-radius:4px;padding:4px}"+
+        "#tmtArchivePanel .tmtARRow{display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:1px dotted #234}"+
+        "#tmtArchivePanel .tmtARName{color:#dfd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"+
+        "#tmtArchivePanel .tmtARTime{color:#a86;flex-shrink:0;font-size:11px}"+
+        "#tmtArchivePanel .tmtARTag{color:#8fd;flex-shrink:0;font-size:11px;border:1px solid #345;border-radius:3px;padding:0 3px}"+
+        "#tmtArchivePanel .tmtARSite{color:#fff;margin:6px 0 2px}"+
+        "#tmtArchivePanel .tmtARSite .tmtARHost{color:#999;font-size:11px}"+
+        "#tmtArchivePanel .tmtARFoot{margin-top:8px;display:flex;align-items:center;gap:8px}"+
+        "#tmtArchivePanel .tmtARStatus{color:#0f0;flex:1;min-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}"+
+        "#tmtArchivePanel button{background:#000;color:#0f0;border:1px solid #0f0;border-radius:4px;"+
+            "padding:0 6px;cursor:pointer;font:11px monospace;flex-shrink:0}"+
+        "#tmtArchivePanel button:hover{background:#0f0;color:#000}"+
+        "#tmtArchivePanel input[type=checkbox]{accent-color:#0f0}";
+    (document.head||document.documentElement).appendChild(st);
+}
+
+let tmtArchiveFlashTimer=null;
+function tmtArchiveFlash(msg){
+    const el=document.querySelector("#tmtArchivePanel .tmtARStatus");
+    if(!el)return;
+    el.textContent=msg;
+    if(tmtArchiveFlashTimer)clearTimeout(tmtArchiveFlashTimer);
+    tmtArchiveFlashTimer=setTimeout(()=>{el.textContent="";},1800);
+}
+
+function tmtArchivePanelRefresh(){
+    const p=document.getElementById("tmtArchivePanel");
+    if(!p)return;
+    const body=p.querySelector(".tmtARBody");
+    const bar=p.querySelector(".tmtARBar");
+    const head=p.querySelector(".tmtARHead");
+    const siteKey=tmtArchiveSiteKey();
+    head.textContent=tmtT("a_title")+" — "+tmtT("a_curTree",{N:siteKey});
+
+    
+    bar.innerHTML="";
+    const db0=tmtArchiveDB();
+    const cur=tmtArchiveSite(db0,false);
+    const lab=document.createElement("label");
+    const cb=document.createElement("input");
+    cb.type="checkbox";
+    cb.checked=!!(cur&&cur.auto);
+    cb.onchange=()=>{
+        tmtArchiveMutate(db=>{tmtArchiveSite(db,true).auto=cb.checked;});
+        tmtArchiveFlash(cb.checked?tmtT("a_auto"):tmtT("a_tagManual"));
+    };
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(tmtT("a_auto")));
+    bar.appendChild(lab);
+    const mk=(text,fn)=>{
+        const b=document.createElement("button");
+        b.textContent=text;
+        b.onclick=fn;
+        bar.appendChild(b);
+        return b;
+    };
+    mk(tmtT("a_now"),()=>{tmtArchiveAdd({auto:false});tmtArchiveFlash(tmtT("a_saved"));tmtArchivePanelRefresh();});
+    mk(tmtT("a_impClip"),tmtArchiveImportClipboard);
+    mk(tmtT("a_impFile"),tmtArchiveImportFile);
+    mk(tmtArchiveShowAll?tmtT("a_showCur"):tmtT("a_showAll"),()=>{tmtArchiveShowAll=!tmtArchiveShowAll;tmtArchivePanelRefresh();});
+    mk(tmtT("e_close"),tmtArchiveClosePanel);
+
+    
+    body.innerHTML="";
+    const db=tmtArchiveDB();
+    const rowOf=(sKey,entry)=>{
+        const row=document.createElement("div");
+        row.className="tmtARRow";
+        const tag=document.createElement("span");
+        tag.className="tmtARTag";
+        tag.textContent=tmtT(entry.auto?"a_tagAuto":"a_tagManual");
+        row.appendChild(tag);
+        const name=document.createElement("span");
+        name.className="tmtARName";
+        name.textContent=entry.name||"—";
+        name.title=entry.name||"";
+        if(!entry.name)name.style.color="#789";
+        row.appendChild(name);
+        const time=document.createElement("span");
+        time.className="tmtARTime";
+        time.textContent=tmtArchiveDispTime(entry.time);
+        row.appendChild(time);
+        const act=(text,fn)=>{
+            const b=document.createElement("button");
+            b.textContent=text;
+            b.onclick=fn;
+            row.appendChild(b);
+        };
+        act(tmtT("a_load"),()=>tmtArchiveApply(sKey,entry.id));
+        act(tmtT("a_clip"),()=>tmtArchiveExportClipboard(sKey,entry.id));
+        act(tmtT("a_file"),()=>tmtArchiveExportFile(sKey,entry.id));
+        act(tmtT("a_rename"),()=>tmtArchiveRename(sKey,entry.id));
+        act(tmtT("e_deleteTip"),()=>{
+            const label=entry.name||tmtArchiveDispTime(entry.time);
+            if(confirm(tmtT("a_confirmDelete",{N:label}))){tmtArchiveDelete(sKey,entry.id);tmtArchivePanelRefresh();}
+        });
+        return row;
+    };
+    if(tmtArchiveShowAll){
+        const keys=Object.keys(db.sites).sort();
+        let shown=0;
+        for(const sKey of keys){
+            const site=db.sites[sKey];
+            if(!site||!Array.isArray(site.archives)||!site.archives.length)continue;
+            shown++;
+            const sh=document.createElement("div");
+            sh.className="tmtARSite";
+            sh.textContent=tmtT("a_siteHead",{N:sKey})+" ";
+            const cnt=document.createElement("span");
+            cnt.className="tmtARHost";
+            const hosts=Array.isArray(site.hosts)&&site.hosts.length?site.hosts.join(", "):"";
+            cnt.textContent=tmtT("a_siteCount",{C:site.archives.length})+(hosts?" · "+hosts:"");
+            sh.appendChild(cnt);
+            body.appendChild(sh);
+            for(const entry of site.archives)body.appendChild(rowOf(sKey,entry));
+        }
+        if(!shown){
+            const empty=document.createElement("div");
+            empty.style.color="#999";
+            empty.textContent=tmtT("a_empty");
+            body.appendChild(empty);
+        }
+    }
+    else{
+        const site=cur;
+        if(!site||!site.archives.length){
+            const empty=document.createElement("div");
+            empty.style.color="#999";
+            empty.textContent=tmtT("a_empty");
+            body.appendChild(empty);
+        }
+        else{
+            for(const entry of site.archives)body.appendChild(rowOf(siteKey,entry));
+        }
+    }
+}
+
+function tmtArchiveClosePanel(){
+    const p=document.getElementById("tmtArchivePanel");
+    if(p)p.remove();
+    tmtArchiveShowAll=false;
+}
+
+function tmtArchiveOpenPanel(){
+    if(document.getElementById("tmtArchivePanel")){tmtArchiveClosePanel();return;}
+    tmtArchiveStyle();
+    const overlay=document.createElement("div");
+    overlay.id="tmtArchivePanel";
+    const panel=document.createElement("div");
+    panel.className="tmtARPanel";
+    const head=document.createElement("div");
+    head.className="tmtARHead";
+    const bar=document.createElement("div");
+    bar.className="tmtARBar";
+    const body=document.createElement("div");
+    body.className="tmtARBody";
+    const foot=document.createElement("div");
+    foot.className="tmtARFoot";
+    const status=document.createElement("span");
+    status.className="tmtARStatus";
+    foot.appendChild(status);
+    panel.appendChild(head);panel.appendChild(bar);panel.appendChild(body);panel.appendChild(foot);
+    overlay.appendChild(panel);
+    (document.body||document.documentElement).appendChild(overlay);
+    overlay.addEventListener("click",(e)=>{if(e.target===overlay)tmtArchiveClosePanel();});
+    try{tmtArchiveTouchHost();}catch(e){}
+    tmtArchivePanelRefresh();
+}
+
+
+
+
+
+
+
+
+
+
+const TMT_HOTKEYS_KEY="__hotkeys";
+let tmtHotkeysBooted=false;
+let tmtHotkeyRecord=null;
+
+
+
+function tmtHotkeyStore(create){
+    if(typeof mod==="undefined"||!mod)return null;
+    let st=mod[TMT_HOTKEYS_KEY];
+    if(typeof st!=="object"||st===null||Array.isArray(st)){
+        if(!create)return null;
+        st=mod[TMT_HOTKEYS_KEY]={};
+    }
+    return st;
+}
+
+
+function tmtHotkeyComboOf(e){
+    let k=e.key;
+    if(k===" ")k="space";
+    if(typeof k==="string"&&k.length===1)k=k.toLowerCase();
+    let combo=String(k);
+    if(e.ctrlKey)combo="ctrl+"+combo;
+    if(e.altKey)combo="alt+"+combo;
+    if(e.shiftKey)combo="shift+"+combo;
+    return combo;
+}
+
+function tmtHotkeySet(layer,combo){
+    const st=tmtHotkeyStore(true);
+    if(!st)return false;
+    if(combo)st[layer]=combo;
+    else delete st[layer];
+    try{if(typeof save==="function")save();}catch(e){}
+    return true;
+}
+
+
+
+
+function tmtHotkeyReset(layer){
+    try{
+        if(typeof layers==="undefined"||!layers[layer])return;
+        if(typeof player==="undefined"||!player[layer])return;
+        if(typeof tmp==="undefined"||!tmp||!tmp[layer])return;
+        if(typeof canReset==="function"&&!canReset(layer))return;
+        if(typeof doReset==="function")doReset(layer);
+    }catch(e){
+        if(typeof console!=="undefined"&&console.warn)console.warn("[TMT-Live] hotkey",e);
+    }
+}
+
+function tmtHotkeyOnKey(e){
+    if(tmtHotkeyRecord)return;
+    const t=e.target,tag=t&&t.tagName;
+    
+    if(t&&(t.isContentEditable||tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"))return;
+    const st=tmtHotkeyStore(false);
+    if(!st)return;
+    const combo=tmtHotkeyComboOf(e);
+    let layer=null;
+    for(const k in st){
+        if(st[k]===combo){layer=k;break;}
+    }
+    if(!layer)return;
+    if(typeof layers==="undefined"||!layers[layer])return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    tmtHotkeyReset(layer);
+}
+
+function tmtHotkeyBoot(){
+    if(tmtHotkeysBooted)return;
+    if(typeof document==="undefined")return;
+    tmtHotkeysBooted=true;
+    window.addEventListener("keydown",tmtHotkeyOnKey,true);
+}
+
+if(typeof document!=="undefined"){
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",tmtHotkeyBoot);
+    else tmtHotkeyBoot();
+}
+
+
+
+function tmtHotkeyStartRecord(layer){
+    tmtHotkeyCancelRecord();
+    const rec=(e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        if(e.key==="Escape"){tmtHotkeyCancelRecord();tmtHotkeysPanelRefresh();return;}
+        if(["Control","Shift","Alt","Meta","CapsLock"].indexOf(e.key)>=0)return;
+        const combo=tmtHotkeyComboOf(e);
+        tmtHotkeySet(layer,combo);
+        tmtHotkeyRecord=null;
+        window.removeEventListener("keydown",rec,true);
+        tmtHotkeyFlash(tmtT("h_bound",{L:layer,K:combo}));
+        tmtHotkeysPanelRefresh();
+    };
+    tmtHotkeyRecord={layer:layer,onkey:rec};
+    window.addEventListener("keydown",rec,true);
+    tmtHotkeysPanelRefresh();
+}
+
+function tmtHotkeyCancelRecord(){
+    const r=tmtHotkeyRecord;
+    if(!r)return;
+    tmtHotkeyRecord=null;
+    window.removeEventListener("keydown",r.onkey,true);
+    tmtHotkeysPanelRefresh();
+}
+
+
+
+
+function tmtHotkeyEngineList(layer){
+    const ld=layers[layer];
+    if(!ld||!ld.hotkeys)return [];
+    const pairs=Array.isArray(ld.hotkeys)
+        ?ld.hotkeys.map((h,i)=>[String(i),h])
+        :Object.keys(ld.hotkeys).map(k=>[k,ld.hotkeys[k]]);
+    return pairs.filter(p=>p[1]&&p[1].key);
+}
+
+function tmtHotkeyEngineUnlocked(layer,id,hk){
+    try{
+        if(typeof tmp!=="undefined"&&tmp&&tmp[layer]&&tmp[layer].hotkeys&&tmp[layer].hotkeys[id])
+            return tmp[layer].hotkeys[id].unlocked;
+    }catch(e){}
+    return undefined;
+}
+
+
+
+function tmtHotkeysStyle(){
+    if(document.getElementById("tmtHotkeysStyle"))return;
+    const st=document.createElement("style");
+    st.id="tmtHotkeysStyle";
+    st.textContent=
+        "#tmtHotkeysPanel{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:1000000;"+
+            "display:flex;align-items:center;justify-content:center;font:12px/1.7 monospace}"+
+        "#tmtHotkeysPanel .tmtHKPanel{background:#111;color:#ddd;border:1px solid #0f0;border-radius:8px;"+
+            "padding:12px 14px;width:640px;max-width:94vw;max-height:84vh;display:flex;flex-direction:column;"+
+            "box-shadow:0 4px 24px rgba(0,0,0,.6)}"+
+        "#tmtHotkeysPanel .tmtHKHead{color:#0f0;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}"+
+        "#tmtHotkeysPanel .tmtHKBody{overflow:auto;max-height:58vh;border:1px solid #234;border-radius:4px;padding:4px}"+
+        "#tmtHotkeysPanel .tmtHKLayer{margin-bottom:8px;border-bottom:1px solid #234;padding-bottom:4px}"+
+        "#tmtHotkeysPanel .tmtHKLayerName{color:#fff;font-weight:bold}"+
+        "#tmtHotkeysPanel .tmtHKRow{display:flex;gap:6px;align-items:center;padding:1px 0 1px 12px}"+
+        "#tmtHotkeysPanel .tmtHKKey{color:#0f0;border:1px solid #0f0;border-radius:3px;padding:0 5px;flex-shrink:0;min-width:52px;text-align:center}"+
+        "#tmtHotkeysPanel .tmtHKDesc{color:#dfd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"+
+        "#tmtHotkeysPanel .tmtHKLvTag{color:#a86;flex-shrink:0;font-size:11px}"+
+        "#tmtHotkeysPanel .tmtHKNone{color:#789;padding:1px 0 1px 12px}"+
+        "#tmtHotkeysPanel .tmtHKFoot{margin-top:8px;display:flex;align-items:center;gap:8px}"+
+        "#tmtHotkeysPanel .tmtHKStatus{color:#0f0;flex:1;min-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}"+
+        "#tmtHotkeysPanel .tmtHKNote{color:#999;font-size:11px;margin-top:6px}"+
+        "#tmtHotkeysPanel button{background:#000;color:#0f0;border:1px solid #0f0;border-radius:4px;"+
+            "padding:0 6px;cursor:pointer;font:11px monospace;flex-shrink:0}"+
+        "#tmtHotkeysPanel button:hover{background:#0f0;color:#000}";
+    (document.head||document.documentElement).appendChild(st);
+}
+
+let tmtHotkeyFlashTimer=null;
+function tmtHotkeyFlash(msg){
+    const el=document.querySelector("#tmtHotkeysPanel .tmtHKStatus");
+    if(!el)return;
+    el.textContent=msg;
+    if(tmtHotkeyFlashTimer)clearTimeout(tmtHotkeyFlashTimer);
+    tmtHotkeyFlashTimer=setTimeout(()=>{el.textContent="";},1800);
+}
+
+function tmtHotkeysPanelRefresh(){
+    const p=document.getElementById("tmtHotkeysPanel");
+    if(!p)return;
+    if(typeof layers==="undefined"){p.querySelector(".tmtHKBody").textContent="";return;}
+    const body=p.querySelector(".tmtHKBody");
+    body.innerHTML="";
+    const st=tmtHotkeyStore(false)||{};
+    for(const layer of Object.keys(layers)){
+        const box=document.createElement("div");
+        box.className="tmtHKLayer";
+        const nameRow=document.createElement("div");
+        nameRow.className="tmtHKLayerName";
+        nameRow.textContent=layer;
+        box.appendChild(nameRow);
+
+        
+        const engine=tmtHotkeyEngineList(layer);
+        if(!engine.length){
+            const none=document.createElement("div");
+            none.className="tmtHKNone";
+            none.textContent=tmtT("h_noneEngine");
+            box.appendChild(none);
+        }
+        for(const [id,hk] of engine){
+            const row=document.createElement("div");
+            row.className="tmtHKRow";
+            const key=document.createElement("span");
+            key.className="tmtHKKey";
+            key.textContent=String(hk.key);
+            row.appendChild(key);
+            let desc=hk.description;
+            try{if(typeof desc==="function")desc=desc.call(hk);}catch(e){desc="";}
+            const d=document.createElement("span");
+            d.className="tmtHKDesc";
+            d.textContent=desc?("「"+layer+"」"+desc):tmtT("h_engine");
+            row.appendChild(d);
+            const un=tmtHotkeyEngineUnlocked(layer,id,hk);
+            if(un===false){
+                const tag=document.createElement("span");
+                tag.className="tmtHKLvTag";
+                tag.textContent=tmtT("h_locked");
+                row.appendChild(tag);
+            }
+            box.appendChild(row);
+        }
+
+        
+        const crow=document.createElement("div");
+        crow.className="tmtHKRow";
+        const label=document.createElement("span");
+        label.className="tmtHKLvTag";
+        label.textContent=tmtT("h_custom")+" "+tmtT("h_reset",{L:layer})+"：";
+        crow.appendChild(label);
+        const key=document.createElement("span");
+        key.className="tmtHKKey";
+        const cur=st[layer];
+        if(tmtHotkeyRecord&&tmtHotkeyRecord.layer===layer){
+            key.textContent="…";
+            key.title=tmtT("h_recording");
+        }
+        else{
+            key.textContent=cur||tmtT("h_none");
+            if(!cur){key.style.borderColor="#345";key.style.color="#789";}
+        }
+        crow.appendChild(key);
+        const setBtn=document.createElement("button");
+        setBtn.textContent=(tmtHotkeyRecord&&tmtHotkeyRecord.layer===layer)?tmtT("h_recording"):tmtT("h_set");
+        setBtn.onclick=()=>{
+            if(tmtHotkeyRecord&&tmtHotkeyRecord.layer===layer)tmtHotkeyCancelRecord();
+            else tmtHotkeyStartRecord(layer);
+        };
+        crow.appendChild(setBtn);
+        const clearBtn=document.createElement("button");
+        clearBtn.textContent=tmtT("h_clear");
+        clearBtn.toggleAttribute("disabled",!cur);
+        if(cur)clearBtn.onclick=()=>{
+            tmtHotkeySet(layer,null);
+            tmtHotkeyFlash(tmtT("h_cleared",{L:layer}));
+            tmtHotkeysPanelRefresh();
+        };
+        crow.appendChild(clearBtn);
+        box.appendChild(crow);
+        body.appendChild(box);
+    }
+}
+
+function tmtHotkeysClosePanel(){
+    const p=document.getElementById("tmtHotkeysPanel");
+    if(p)p.remove();
+    if(tmtHotkeyRecord)tmtHotkeyCancelRecord();
+}
+
+function tmtHotkeysOpenPanel(){
+    if(document.getElementById("tmtHotkeysPanel")){tmtHotkeysClosePanel();return;}
+    if(typeof layers==="undefined")return;
+    tmtHotkeysStyle();
+    const overlay=document.createElement("div");
+    overlay.id="tmtHotkeysPanel";
+    const panel=document.createElement("div");
+    panel.className="tmtHKPanel";
+    const head=document.createElement("div");
+    head.className="tmtHKHead";
+    const title=document.createElement("span");
+    title.textContent=tmtT("h_title");
+    const close=document.createElement("button");
+    close.textContent=tmtT("e_close");
+    close.onclick=tmtHotkeysClosePanel;
+    head.appendChild(title);head.appendChild(close);
+    const body=document.createElement("div");
+    body.className="tmtHKBody";
+    const foot=document.createElement("div");
+    foot.className="tmtHKFoot";
+    const status=document.createElement("span");
+    status.className="tmtHKStatus";
+    foot.appendChild(status);
+    const note=document.createElement("div");
+    note.className="tmtHKNote";
+    note.textContent=tmtT("h_note");
+    panel.appendChild(head);panel.appendChild(body);panel.appendChild(foot);panel.appendChild(note);
+    overlay.appendChild(panel);
+    (document.body||document.documentElement).appendChild(overlay);
+    overlay.addEventListener("click",(e)=>{if(e.target===overlay)tmtHotkeysClosePanel();});
+    tmtHotkeysPanelRefresh();
+}
+
+
+
+
+
+
+
+
+
+
 function tmtPtrFrom(path){
 	const m=path.match(/^(?:tmp|layers)\[(\w+)\]\.(.+)$/);
 	if(!m)return null;
@@ -2544,6 +3421,8 @@ function tmtLiveBarButtons(){
 	return '<button data-act="editor">'+tmtT("b_editor")+'</button>'+
 		'<button data-act="add">'+tmtT("b_add")+'</button>'+
 		'<button data-act="layout" title="'+tmtT("l_hint")+'">'+tmtT("b_layout")+'</button>'+
+		'<button data-act="archive">'+tmtT("b_archive")+'</button>'+
+		'<button data-act="hotkeys">'+tmtT("b_hotkeys")+'</button>'+
 		'<button data-act="export">'+tmtT("b_export")+'</button>'+
 		'<button data-act="exportjs">'+tmtT("b_exportJs")+'</button>'+
 		'<button data-act="import">'+tmtT("b_import")+'</button>'+
@@ -2588,6 +3467,12 @@ function tmtLiveBuildBar(){
 		}
 		else if(act==="layout"){
 			tmtLayoutToggle();
+		}
+		else if(act==="archive"){
+			tmtArchiveOpenPanel();
+		}
+		else if(act==="hotkeys"){
+			tmtHotkeysOpenPanel();
 		}
 		else if(act==="export"){
 			tmtCopyText(modToJSON(window.mod||{}));
@@ -2637,6 +3522,9 @@ function tmtLiveApplyLang(){
 	}
 	const ed=document.getElementById("tmtEditor");
 	if(ed)ed.remove();
+	
+	tmtArchiveClosePanel();
+	tmtHotkeysClosePanel();
 	if(typeof tmtLayoutRefreshUI==="function")tmtLayoutRefreshUI();
 }
 
@@ -2696,6 +3584,10 @@ function tmtLiveBoot(){
 	window.applyEdits=applyEdits;
 	window.modToJSON=modToJSON;
 	window.modFromJSON=modFromJSON;
+	
+	
+	window.tmtEncodeValue=tmtEncodeValue;
+	window.tmtDecodeValue=tmtDecodeValue;
 	window.modstringify=modstringify;
 	window.get_layer_js=get_layer_js;
 	window.tmtCopyText=tmtCopyText;
@@ -2713,8 +3605,17 @@ function tmtLiveBoot(){
 	window.tmtLayoutResetAll=tmtLayoutResetAll;
 	window.tmtLayoutRefreshUI=tmtLayoutRefreshUI;
 
+	
+	window.tmtArchiveOpenPanel=tmtArchiveOpenPanel;
+	window.tmtArchiveClosePanel=tmtArchiveClosePanel;
+	window.tmtArchiveAutoTick=tmtArchiveAutoTick;
+	window.tmtHotkeysOpenPanel=tmtHotkeysOpenPanel;
+	window.tmtHotkeysClosePanel=tmtHotkeysClosePanel;
+
 	tmtLiveBuildBar();
 	tmtLayoutBoot();
+	tmtArchiveBoot();
+	tmtHotkeyBoot();
 
 	
 	
